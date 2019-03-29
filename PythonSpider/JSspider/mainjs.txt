@@ -1,0 +1,149 @@
+var splitText;
+var split_location;
+var blockborder = [];
+var pBlock = {};//key = blockidx; value = 对应的平行块数组。
+var isBookLeftToRight = true;
+//标点符号可能有时单独一行,处理之.
+for(var b = 0;b<block.length;b++){
+    var lines = block[b][0];
+    for (var i= 0;i<lines.length-1;i++){
+
+        if (lines[i+1] - lines[i] <4){
+            //合并行
+
+            var theline =block[b][2][i];
+            var nextline =block[b][2][i+1];
+
+
+            while ( theline.length>0 ){
+
+                var thelineChar = theline[0];
+
+                for (var x2=0;x2<nextline.length;x2++){
+                    if (nextline[x2][0] > thelineChar[0]){
+                        break;
+                    }
+                }
+
+                nextline.splice(x2,0,thelineChar);
+                theline.splice(0,1);
+
+
+            }
+
+            block[b][0].splice(i,1);
+            block[b][2].splice(i,1);
+            block[b][1].splice(i,1);
+            i--;
+        }
+    }
+}
+//取出第一个空元素
+block.shift();
+
+//确定书的左右读取顺序
+if(block.length>2&&block[0][2][0].length==1&&block[1][2][0].length==1) isBookLeftToRight = false;
+
+//todo 竖版页码处理
+if(!isBookLeftToRight){
+    //最后一块不是页码块，即页码与上一块切到一块了。
+    if(block[block.length-1][2].length!=1){
+        var pidx = block.length;
+        var pageblockLineAr = block[block.length-1][2].pop();
+        var pageblockLines = block[block.length-1][0].pop();
+        var pageblockLineHeight = block[block.length-1][1].pop();
+        block[pidx]=[];
+        block[pidx][0] = pageblockLines;
+        block[pidx][1] =pageblockLineHeight;
+        block[pidx][2] =pageblockLineAr;
+    }
+}
+
+//计算块的上下左右边界(排除页码)
+blockborder = [];
+for(var b = 0;b<block.length;b++){
+    var lines = block[b][0];
+    var linesHeight = block[b][1];
+    var lineAr = block[b][2]
+    blockborder[b]= [];
+    var borderleft,borderright;
+    for (var i= 0;i<lines.length;i++){
+        var fontw =(lineAr[i][lineAr[i].length-1][0]-lineAr[i][0][0])/lineAr[i].length
+        if (lineAr[i].length<2) fontw=16;
+
+        if(i==0||borderleft>block[b][2][i][0][0]&&borderleft-block[b][2][i][0][0]<300) {
+            borderleft=block[b][2][i][0][0];
+            borderleft = borderleft -fontw;
+        }
+        if(i==0||borderright<block[b][2][i][block[b][2][i].length-1][0]){
+            borderright=block[b][2][i][block[b][2][i].length-1][0];
+             borderright = borderright +fontw;
+        }
+    }
+    var bordertop = lines[0]-linesHeight[0]
+    var borderbottom =lines[lines.length-1];
+    blockborder[b]=[borderleft,borderright,bordertop,borderbottom];
+}
+//对块进行重新排序;主要是对页头与页尾已及页标签进行重新定位。
+//页头Bottom一定是在最靠上的，如果最靠上的不是block数组中的第一位则存在页头，否则认为页头就在第一位或者不判断;页标签，页尾不处理。
+//复制数组，不能直接赋值不然原数组也会跟着边
+if(isBookLeftToRight){
+    var tempB = blockborder.slice(0);
+    tempB.sort(sortByBottom);
+    if(blockborder.length!=0&&blockborder.indexOf(tempB[0])!=0){
+        var removeblock = block[blockborder.indexOf(tempB[0])];
+        block=remove(block,blockborder.indexOf(tempB[0]));
+        block.unshift(removeblock);
+        var removeborder = blockborder[blockborder.indexOf(tempB[0])];
+        blockborder=remove(blockborder,blockborder.indexOf(tempB[0]));
+        blockborder.unshift(removeborder);
+    }
+}
+
+//块按照Bottom值排序
+function sortByBottom(a,b) {
+    return a[3]-b[3];
+}
+
+function remove(array,index)
+{
+    if(index<=(array.length-1))
+    {
+        for(var i=index;i<array.length;i++)
+        {
+            array[i]=array[i+1];
+        }
+    }
+    else
+    {
+        throw new Error('超出最大索引！');
+    }
+    array.length=array.length-1;
+    return array;
+}
+
+//确定平行块数组
+for(var b=0;b<block;b++){
+    var key = b;
+    pBlock[key]=[];
+    for(var pb=0;pb<block;pb++){
+        if(pb!=b&&blockborder[pb][2]<=blockborder[b][3]&&blockborder[pb][3]>=blockborder[2]
+            &&(blockborder[pb][0]>blockborder[b][1]||blockborder[pb][1]<blockborder[b][0])){
+            pBlock[key].push(pb)
+        }
+    }
+}
+
+var i,j,k,str=" ";
+var gg,cc;
+for(j=0;j<block.length;j++) {
+  gg=block[j][2];
+  for (i = 0; i < gg.length; i++) {
+      for(k=0;k<gg[i].length;k++) {
+          cc = gg[i][k][1];
+          str+=cc;
+      }
+      str=str+'\n';
+  }
+}
+return str;
